@@ -4,14 +4,15 @@ This branch adapts the `autoresearch` workflow to `/Users/jairopolanco/Projects/
 
 ## Goal
 
-Advance `model3_v3` until it is the clear default over `model3_v2` on a fixed local bakeoff.
+Advance `model3_v2` until it is the best quality/throughput/FLOP point in the `model3` family.
 
 Primary success criterion:
-- lower `model3_v3` validation CE at the end of the fixed benchmark
+- lower `model3_v2` validation CE at the end of the fixed benchmark
 
 Secondary success criteria:
-- lower `model3_v3` step time
-- lower `model3_v3` decode probe time
+- lower `model3_v2` step time
+- lower `model3_v2` decode probe time
+- eventually clear `model3_v3` on the same benchmark, or match it while staying meaningfully cheaper
 
 Do not accept quality wins that come with disproportionate train-time regressions unless they materially improve the long-run architecture ceiling.
 
@@ -25,6 +26,7 @@ Work in this target repo:
 
 Primary in-scope files there:
 - `ouroboros/model3/*.py`
+- `ouroboros/config/train_nano_25m_model3_v2.py`
 - `ouroboros/config/train_nano_25m_model3_v3.py`
 - `tests/test_model3_basic.py`
 - `tests/test_metrics_spec_helpers.py`
@@ -45,20 +47,21 @@ python run_recursivellm_bakeoff.py \
 ```
 
 This compares:
-- `train_nano_25m_model3_v2.py`
-- `train_nano_25m_model3_v3.py`
+- primary target: `train_nano_25m_model3_v2.py`
+- reference line: `train_nano_25m_model3_v3.py`
 
 using the local `data/stage1_fwe` corpus in the target repo.
 
 ## Keep / Discard Rule
 
 Keep a `RecursiveLLM` change only if one of these is true:
-- `model3_v3` final validation CE improves versus the previous kept run
-- CE is statistically tied, but `model3_v3` step time or decode time improves materially
+- `model3_v2` final validation CE improves versus the previous kept run
+- CE is statistically tied, but `model3_v2` step time or decode time improves materially
+- `model3_v2` closes the gap to `model3_v3` while preserving its train-time efficiency edge
 - the change simplifies the code while staying neutral on the benchmark
 
 Discard if:
-- `model3_v3` CE regresses
+- `model3_v2` CE regresses
 - step time grows with no compensating quality win
 - the change adds mechanism without benchmark evidence
 
@@ -69,7 +72,7 @@ Log every run to `results.tsv` in this repo.
 Columns:
 
 ```text
-timestamp	recursivellm_commit	v2_val_ce	v3_val_ce	v2_step_ms	v3_step_ms	status	description
+timestamp	recursivellm_commit	v2_val_ce	v3_val_ce	v2_step_ms	v3_step_ms	v2_decode_ms	v3_decode_ms	status	description
 ```
 
 Status:
@@ -79,6 +82,7 @@ Status:
 
 ## Notes
 
-- Treat `model3_v2` as the control.
-- Treat `model3_v3` as the research target.
+- Treat `model3_v2` as the research target.
+- Treat `model3_v3` as a frontier reference, not the main branch.
 - Prefer exact optimizations and mathematically clean changes over speculative mechanism growth.
+- Start from the hypotheses in `research_notes_mar2026.md` before inventing new mechanisms.

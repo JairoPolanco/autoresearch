@@ -58,6 +58,16 @@ def _eval_val(model, mem: np.memmap, *, block_size: int, seed: int, step_arg: in
     return sum(losses) / len(losses)
 
 
+def _decode_probe_ms(model, *, vocab_size: int, block_size: int) -> float:
+    model.eval()
+    prefix_len = min(16, max(1, block_size - 2))
+    idx = torch.randint(0, int(vocab_size), (1, prefix_len))
+    with torch.no_grad():
+        t0 = time.perf_counter()
+        _ = model.generate(idx, max_new_tokens=2, top_k=1)
+        return (time.perf_counter() - t0) * 1000.0
+
+
 def _run_variant(model_cls, cfg, train_data: np.memmap, val_data: np.memmap, *, steps: int, seeds: list[int]) -> dict[str, float | list]:
     rows = []
     for seed in seeds:
@@ -83,12 +93,14 @@ def _run_variant(model_cls, cfg, train_data: np.memmap, val_data: np.memmap, *, 
             opt.step()
             step_times.append((time.perf_counter() - t0) * 1000.0)
         val_end = _eval_val(model, val_data, block_size=int(cfg.block_size), seed=seed + 2000, step_arg=steps)
+        decode_ms = _decode_probe_ms(model, vocab_size=int(cfg.vocab_size), block_size=int(cfg.block_size))
         rows.append(
             {
                 "seed": seed,
                 "val_start": val0,
                 "val_end": val_end,
                 "mean_step_ms": sum(step_times[1:]) / max(1, len(step_times[1:])),
+                "decode_probe_ms": decode_ms,
             }
         )
     return {
@@ -96,6 +108,7 @@ def _run_variant(model_cls, cfg, train_data: np.memmap, val_data: np.memmap, *, 
         "mean_val_start": sum(r["val_start"] for r in rows) / len(rows),
         "mean_val_end": sum(r["val_end"] for r in rows) / len(rows),
         "mean_step_ms": sum(r["mean_step_ms"] for r in rows) / len(rows),
+        "mean_decode_probe_ms": sum(r["decode_probe_ms"] for r in rows) / len(rows),
     }
 
 
