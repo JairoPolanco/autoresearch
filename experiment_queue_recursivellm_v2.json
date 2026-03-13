@@ -1,0 +1,582 @@
+{
+  "defaults": {
+    "steps": 16,
+    "final_steps": 32,
+    "block_size": 32,
+    "step_offset": 0,
+    "optimizer_overrides": {
+      "learning_rate": 0.000262,
+      "weight_decay": 0.1,
+      "beta1": 0.9,
+      "beta2": 0.95
+    }
+  },
+  "queue": [
+    {
+      "name": "sparse_teacher_first_last",
+      "stage": "control_teacher",
+      "priority": 100,
+      "tags": ["high_roi", "teacher", "control"],
+      "description": "Replace dense exact planner teacher with sparse critic calibration on first/last loops.",
+      "v2_overrides": {
+        "planner_teacher_mode": "critic_sparse",
+        "planner_probe_mode": "first_last",
+        "planner_calibration_interval": 1024
+      }
+    },
+    {
+      "name": "sparse_teacher_stride2",
+      "stage": "control_teacher",
+      "priority": 98,
+      "tags": ["high_roi", "teacher", "control"],
+      "description": "Sparse critic teacher plus stride-2 block probes to cut supervision cost further.",
+      "v2_overrides": {
+        "planner_teacher_mode": "critic_sparse",
+        "planner_probe_mode": "first_last",
+        "planner_probe_block_stride": 2,
+        "planner_calibration_interval": 1024
+      }
+    },
+    {
+      "name": "sparse_teacher_stride4",
+      "stage": "control_teacher",
+      "priority": 96,
+      "tags": ["high_roi", "teacher", "control"],
+      "description": "More aggressive stride-4 sparse planner probes.",
+      "v2_overrides": {
+        "planner_teacher_mode": "critic_sparse",
+        "planner_probe_mode": "first_last",
+        "planner_probe_block_stride": 4,
+        "planner_calibration_interval": 1024
+      }
+    },
+    {
+      "name": "sparse_teacher_sampled_every2",
+      "stage": "control_teacher",
+      "priority": 94,
+      "tags": ["high_roi", "teacher", "control"],
+      "description": "Sampled sparse planner teacher every 2 loops.",
+      "v2_overrides": {
+        "planner_teacher_mode": "critic_sparse",
+        "planner_probe_mode": "sampled",
+        "planner_probe_every": 2,
+        "planner_calibration_interval": 1024
+      }
+    },
+    {
+      "name": "sparse_teacher_sampled_every4",
+      "stage": "control_teacher",
+      "priority": 92,
+      "tags": ["teacher", "control"],
+      "description": "Sampled sparse planner teacher every 4 loops for maximal supervision savings.",
+      "v2_overrides": {
+        "planner_teacher_mode": "critic_sparse",
+        "planner_probe_mode": "sampled",
+        "planner_probe_every": 4,
+        "planner_calibration_interval": 2048
+      }
+    },
+    {
+      "name": "sparse_teacher_no_halt",
+      "stage": "control_teacher",
+      "priority": 90,
+      "tags": ["teacher", "control", "head_prune"],
+      "description": "Sparse teacher with halt head removed to reduce redundant control heads.",
+      "v2_overrides": {
+        "planner_teacher_mode": "critic_sparse",
+        "planner_probe_mode": "first_last",
+        "planner_calibration_interval": 1024,
+        "planner_use_halt_head": false,
+        "planner_halt_weight": 0.0
+      }
+    },
+    {
+      "name": "sparse_teacher_with_k_head",
+      "stage": "control_teacher",
+      "priority": 88,
+      "tags": ["teacher", "control", "executor"],
+      "description": "Sparse teacher with explicit k-head supervision for active-block width.",
+      "v2_overrides": {
+        "planner_teacher_mode": "critic_sparse",
+        "planner_probe_mode": "first_last",
+        "planner_calibration_interval": 1024,
+        "planner_use_separate_k_head": true,
+        "planner_k_weight": 0.01
+      }
+    },
+    {
+      "name": "sparse_teacher_with_loop_value",
+      "stage": "control_teacher",
+      "priority": 86,
+      "tags": ["teacher", "control", "loop"],
+      "description": "Sparse teacher plus explicit loop-value regression target.",
+      "v2_overrides": {
+        "planner_teacher_mode": "critic_sparse",
+        "planner_probe_mode": "first_last",
+        "planner_calibration_interval": 1024,
+        "planner_loop_value_weight": 0.02
+      }
+    },
+    {
+      "name": "sparse_teacher_low_compute_cost",
+      "stage": "control_teacher",
+      "priority": 84,
+      "tags": ["teacher", "control", "cost"],
+      "description": "Lower compute penalty to encourage planner to spend more recurrent compute.",
+      "v2_overrides": {
+        "planner_teacher_mode": "critic_sparse",
+        "planner_probe_mode": "first_last",
+        "planner_calibration_interval": 1024,
+        "planner_compute_cost": 0.005
+      }
+    },
+    {
+      "name": "sparse_teacher_high_compute_cost",
+      "stage": "control_teacher",
+      "priority": 82,
+      "tags": ["teacher", "control", "cost"],
+      "description": "Higher compute penalty to enforce more aggressive compute pruning.",
+      "v2_overrides": {
+        "planner_teacher_mode": "critic_sparse",
+        "planner_probe_mode": "first_last",
+        "planner_calibration_interval": 1024,
+        "planner_compute_cost": 0.02
+      }
+    },
+    {
+      "name": "loops3",
+      "stage": "budget",
+      "priority": 80,
+      "tags": ["budget", "loops"],
+      "description": "Reduce recurrent depth from 4 to 3 loops.",
+      "v2_overrides": {
+        "n_loops": 3,
+        "min_loops": 1
+      }
+    },
+    {
+      "name": "loops2",
+      "stage": "budget",
+      "priority": 78,
+      "tags": ["budget", "loops"],
+      "description": "Reduce recurrent depth from 4 to 2 loops for stronger throughput gains.",
+      "v2_overrides": {
+        "n_loops": 2,
+        "min_loops": 1
+      }
+    },
+    {
+      "name": "frontier3",
+      "stage": "budget",
+      "priority": 76,
+      "tags": ["budget", "frontier"],
+      "description": "Shrink editable frontier from 4 blocks to 3 blocks.",
+      "v2_overrides": {
+        "workspace_frontier_blocks": 3
+      }
+    },
+    {
+      "name": "frontier2",
+      "stage": "budget",
+      "priority": 74,
+      "tags": ["budget", "frontier"],
+      "description": "Shrink editable frontier from 4 blocks to 2 blocks.",
+      "v2_overrides": {
+        "workspace_frontier_blocks": 2
+      }
+    },
+    {
+      "name": "loops3_frontier3",
+      "stage": "budget",
+      "priority": 72,
+      "tags": ["budget", "loops", "frontier"],
+      "description": "Jointly trim recurrent depth and editable frontier width.",
+      "v2_overrides": {
+        "n_loops": 3,
+        "min_loops": 1,
+        "workspace_frontier_blocks": 3
+      }
+    },
+    {
+      "name": "loops2_frontier2",
+      "stage": "budget",
+      "priority": 70,
+      "tags": ["budget", "loops", "frontier"],
+      "description": "Aggressively trim both loop count and frontier width.",
+      "v2_overrides": {
+        "n_loops": 2,
+        "min_loops": 1,
+        "workspace_frontier_blocks": 2
+      }
+    },
+    {
+      "name": "executor_min_active2",
+      "stage": "budget",
+      "priority": 68,
+      "tags": ["budget", "executor"],
+      "description": "Force at least two active blocks to reduce over-pruning risk.",
+      "v2_overrides": {
+        "executor_min_active_blocks": 2
+      }
+    },
+    {
+      "name": "dense_no_executor",
+      "stage": "budget",
+      "priority": 66,
+      "tags": ["budget", "executor", "dense"],
+      "description": "Disable block executor and run dense frontier updates as a control.",
+      "v2_overrides": {
+        "use_block_executor": false,
+        "planner_k_weight": 0.0,
+        "planner_use_halt_head": false,
+        "planner_halt_weight": 0.0
+      }
+    },
+    {
+      "name": "workspace_slots4",
+      "stage": "workspace",
+      "priority": 64,
+      "tags": ["workspace", "capacity"],
+      "description": "Reduce workspace slots from 6 to 4 to improve throughput.",
+      "v2_overrides": {
+        "workspace_slots": 4
+      }
+    },
+    {
+      "name": "workspace_slots8",
+      "stage": "workspace",
+      "priority": 62,
+      "tags": ["workspace", "capacity"],
+      "description": "Increase workspace slots from 6 to 8 for more memory capacity.",
+      "v2_overrides": {
+        "workspace_slots": 8
+      }
+    },
+    {
+      "name": "workspace_mlp_mult1",
+      "stage": "workspace",
+      "priority": 60,
+      "tags": ["workspace", "capacity"],
+      "description": "Smaller editor/update hidden size via workspace_mlp_mult=1.",
+      "v2_overrides": {
+        "workspace_mlp_mult": 1
+      }
+    },
+    {
+      "name": "workspace_mlp_mult3",
+      "stage": "workspace",
+      "priority": 58,
+      "tags": ["workspace", "capacity"],
+      "description": "Larger editor/update hidden size via workspace_mlp_mult=3.",
+      "v2_overrides": {
+        "workspace_mlp_mult": 3
+      }
+    },
+    {
+      "name": "update_norm_low",
+      "stage": "workspace",
+      "priority": 56,
+      "tags": ["workspace", "stability"],
+      "description": "Tighter workspace and token update clamps.",
+      "v2_overrides": {
+        "workspace_update_max_norm": 0.75,
+        "token_update_max_norm": 0.75
+      }
+    },
+    {
+      "name": "update_norm_high",
+      "stage": "workspace",
+      "priority": 54,
+      "tags": ["workspace", "stability"],
+      "description": "Looser workspace and token update clamps.",
+      "v2_overrides": {
+        "workspace_update_max_norm": 1.25,
+        "token_update_max_norm": 1.25
+      }
+    },
+    {
+      "name": "collapse_tiny",
+      "stage": "workspace",
+      "priority": 52,
+      "tags": ["workspace", "regularization"],
+      "description": "Reintroduce a tiny workspace collapse penalty to stabilize slot diversity.",
+      "v2_overrides": {
+        "workspace_collapse_weight": 0.001
+      }
+    },
+    {
+      "name": "tape_recent8",
+      "stage": "tape_summary",
+      "priority": 50,
+      "tags": ["tape", "memory"],
+      "description": "Shorter exact tape window.",
+      "v2_overrides": {
+        "tape_recent_blocks": 8
+      }
+    },
+    {
+      "name": "tape_recent32",
+      "stage": "tape_summary",
+      "priority": 48,
+      "tags": ["tape", "memory"],
+      "description": "Longer exact tape window.",
+      "v2_overrides": {
+        "tape_recent_blocks": 32
+      }
+    },
+    {
+      "name": "tape_slots1",
+      "stage": "tape_summary",
+      "priority": 46,
+      "tags": ["tape", "memory", "summary"],
+      "description": "One tape slot per finalized block.",
+      "v2_overrides": {
+        "tape_slots_per_block": 1
+      }
+    },
+    {
+      "name": "tape_slots4",
+      "stage": "tape_summary",
+      "priority": 44,
+      "tags": ["tape", "memory", "summary"],
+      "description": "Four tape slots per finalized block.",
+      "v2_overrides": {
+        "tape_slots_per_block": 4
+      }
+    },
+    {
+      "name": "tape_coarse1",
+      "stage": "tape_summary",
+      "priority": 42,
+      "tags": ["tape", "memory"],
+      "description": "Use only one coarse tape level.",
+      "v2_overrides": {
+        "tape_coarse_levels": 1
+      }
+    },
+    {
+      "name": "tape_coarse3",
+      "stage": "tape_summary",
+      "priority": 40,
+      "tags": ["tape", "memory"],
+      "description": "Use three coarse tape levels.",
+      "v2_overrides": {
+        "tape_coarse_levels": 3
+      }
+    },
+    {
+      "name": "tape_detach_off",
+      "stage": "tape_summary",
+      "priority": 38,
+      "tags": ["tape", "gradient"],
+      "description": "Allow tape appends to keep gradient ancestry instead of detached memory.",
+      "v2_overrides": {
+        "tape_detach_append": false
+      }
+    },
+    {
+      "name": "summary_slots2_tail025",
+      "stage": "tape_summary",
+      "priority": 36,
+      "tags": ["summary", "frontier"],
+      "description": "Two frontier summary slots with a light tail-aware blend.",
+      "v2_overrides": {
+        "frontier_summary_slots": 2,
+        "frontier_summary_tail_blend": 0.25
+      }
+    },
+    {
+      "name": "summary_slots2_tail050",
+      "stage": "tape_summary",
+      "priority": 34,
+      "tags": ["summary", "frontier"],
+      "description": "Two frontier summary slots with a stronger tail-aware blend.",
+      "v2_overrides": {
+        "frontier_summary_slots": 2,
+        "frontier_summary_tail_blend": 0.5
+      }
+    },
+    {
+      "name": "editor_local_context",
+      "stage": "editor",
+      "priority": 32,
+      "tags": ["editor", "local_context"],
+      "description": "Enable causal intra-block local context in the token editor.",
+      "v2_overrides": {
+        "editor_use_local_causal_context": true
+      }
+    },
+    {
+      "name": "summary_slots2_tail025_local",
+      "stage": "editor",
+      "priority": 30,
+      "tags": ["editor", "summary", "local_context"],
+      "description": "Combine light richer frontier summaries with local editor context.",
+      "v2_overrides": {
+        "frontier_summary_slots": 2,
+        "frontier_summary_tail_blend": 0.25,
+        "editor_use_local_causal_context": true
+      }
+    },
+    {
+      "name": "summary_slots2_tail050_local",
+      "stage": "editor",
+      "priority": 28,
+      "tags": ["editor", "summary", "local_context"],
+      "description": "Combine stronger tail-aware summaries with local editor context.",
+      "v2_overrides": {
+        "frontier_summary_slots": 2,
+        "frontier_summary_tail_blend": 0.5,
+        "editor_use_local_causal_context": true
+      }
+    },
+    {
+      "name": "lr_2e4",
+      "stage": "optimizer",
+      "priority": 26,
+      "tags": ["optimizer", "lr"],
+      "description": "Lower learning rate to 2.0e-4.",
+      "optimizer_overrides": {
+        "learning_rate": 0.0002
+      }
+    },
+    {
+      "name": "lr_3p3e4",
+      "stage": "optimizer",
+      "priority": 24,
+      "tags": ["optimizer", "lr"],
+      "description": "Slightly higher learning rate at 3.3e-4.",
+      "optimizer_overrides": {
+        "learning_rate": 0.00033
+      }
+    },
+    {
+      "name": "lr_5e4",
+      "stage": "optimizer",
+      "priority": 22,
+      "tags": ["optimizer", "lr"],
+      "description": "Higher learning rate at 5.0e-4.",
+      "optimizer_overrides": {
+        "learning_rate": 0.0005
+      }
+    },
+    {
+      "name": "wd_0p05",
+      "stage": "optimizer",
+      "priority": 20,
+      "tags": ["optimizer", "weight_decay"],
+      "description": "Lower weight decay.",
+      "optimizer_overrides": {
+        "weight_decay": 0.05
+      }
+    },
+    {
+      "name": "wd_0p2",
+      "stage": "optimizer",
+      "priority": 18,
+      "tags": ["optimizer", "weight_decay"],
+      "description": "Higher weight decay.",
+      "optimizer_overrides": {
+        "weight_decay": 0.2
+      }
+    },
+    {
+      "name": "beta2_099",
+      "stage": "optimizer",
+      "priority": 16,
+      "tags": ["optimizer", "betas"],
+      "description": "Slower second-moment decay.",
+      "optimizer_overrides": {
+        "beta2": 0.99
+      }
+    },
+    {
+      "name": "betas_095_099",
+      "stage": "optimizer",
+      "priority": 14,
+      "tags": ["optimizer", "betas"],
+      "description": "Heavier optimizer memory with beta1=0.95 beta2=0.99.",
+      "optimizer_overrides": {
+        "beta1": 0.95,
+        "beta2": 0.99
+      }
+    },
+    {
+      "name": "lr_3p3e4_sparse_teacher",
+      "stage": "optimizer",
+      "priority": 12,
+      "tags": ["optimizer", "lr", "teacher"],
+      "description": "Higher LR combined with sparse planner teacher.",
+      "optimizer_overrides": {
+        "learning_rate": 0.00033
+      },
+      "v2_overrides": {
+        "planner_teacher_mode": "critic_sparse",
+        "planner_probe_mode": "first_last",
+        "planner_calibration_interval": 1024
+      }
+    },
+    {
+      "name": "rope_only",
+      "stage": "substrate",
+      "priority": 10,
+      "tags": ["substrate", "rope"],
+      "description": "Switch token backbone from absolute positions to RoPE.",
+      "v2_overrides": {
+        "use_abs_pos": false,
+        "use_rope": true,
+        "rope_base": 10000.0,
+        "rope_scaling": 1.0
+      }
+    },
+    {
+      "name": "swiglu_only",
+      "stage": "substrate",
+      "priority": 8,
+      "tags": ["substrate", "ffn"],
+      "description": "Switch token FFN from GELU to SwiGLU.",
+      "v2_overrides": {
+        "ffn_type": "swiglu"
+      }
+    },
+    {
+      "name": "gqa_only_kv2",
+      "stage": "substrate",
+      "priority": 6,
+      "tags": ["substrate", "attention"],
+      "description": "Enable grouped-query attention with 2 KV heads.",
+      "v2_overrides": {
+        "n_kv_head": 2
+      }
+    },
+    {
+      "name": "rope_gqa_swiglu",
+      "stage": "substrate",
+      "priority": 4,
+      "tags": ["substrate", "rope", "attention", "ffn"],
+      "description": "Full modernized token backbone: RoPE + GQA + SwiGLU.",
+      "v2_overrides": {
+        "use_abs_pos": false,
+        "use_rope": true,
+        "rope_base": 10000.0,
+        "rope_scaling": 1.0,
+        "n_kv_head": 2,
+        "ffn_type": "swiglu"
+      }
+    },
+    {
+      "name": "two_proposals_sparse_teacher",
+      "stage": "interactions",
+      "priority": 2,
+      "tags": ["interaction", "workspace", "teacher"],
+      "description": "Re-test two proposal deltas only in the cheaper sparse-teacher regime.",
+      "v2_overrides": {
+        "workspace_num_proposals": 2,
+        "workspace_proposal_temp": 0.85,
+        "planner_teacher_mode": "critic_sparse",
+        "planner_probe_mode": "first_last",
+        "planner_calibration_interval": 1024
+      }
+    }
+  ]
+}

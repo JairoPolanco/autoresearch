@@ -68,7 +68,22 @@ def _decode_probe_ms(model, *, vocab_size: int, block_size: int) -> float:
         return (time.perf_counter() - t0) * 1000.0
 
 
-def _run_variant(model_cls, cfg, train_data: np.memmap, val_data: np.memmap, *, steps: int, seeds: list[int]) -> dict[str, float | list]:
+def _run_variant(
+    model_cls,
+    cfg,
+    train_data: np.memmap,
+    val_data: np.memmap,
+    *,
+    steps: int,
+    step_offset: int,
+    seeds: list[int],
+    optimizer_overrides: dict[str, float] | None,
+) -> dict[str, float | list]:
+    opt_cfg = dict(optimizer_overrides or {})
+    learning_rate = float(opt_cfg.get("learning_rate", 2.62e-4))
+    weight_decay = float(opt_cfg.get("weight_decay", 0.1))
+    beta1 = float(opt_cfg.get("beta1", 0.9))
+    beta2 = float(opt_cfg.get("beta2", 0.95))
     rows = []
     for seed in seeds:
         random.seed(seed)
@@ -76,23 +91,29 @@ def _run_variant(model_cls, cfg, train_data: np.memmap, val_data: np.memmap, *, 
         torch.manual_seed(seed)
         model = model_cls(cfg)
         opt = model.configure_optimizers(
-            weight_decay=0.1,
-            learning_rate=2.62e-4,
-            betas=(0.9, 0.95),
+            weight_decay=weight_decay,
+            learning_rate=learning_rate,
+            betas=(beta1, beta2),
             device_type="cpu",
         )
-        val0 = _eval_val(model, val_data, block_size=int(cfg.block_size), seed=seed + 1000, step_arg=0)
+        val0 = _eval_val(model, val_data, block_size=int(cfg.block_size), seed=seed + 1000, step_arg=int(step_offset))
         train_rng = random.Random(seed)
         step_times: list[float] = []
         for step in range(1, steps + 1):
             x, y = _sample_batch(train_data, block_size=int(cfg.block_size), rng=train_rng)
             t0 = time.perf_counter()
-            _, loss, _ = model(x, targets=y, step=step)
+            _, loss, _ = model(x, targets=y, step=int(step_offset) + step)
             opt.zero_grad(set_to_none=True)
             loss.backward()
             opt.step()
             step_times.append((time.perf_counter() - t0) * 1000.0)
-        val_end = _eval_val(model, val_data, block_size=int(cfg.block_size), seed=seed + 2000, step_arg=steps)
+        val_end = _eval_val(
+            model,
+            val_data,
+            block_size=int(cfg.block_size),
+            seed=seed + 2000,
+            step_arg=int(step_offset) + steps,
+        )
         decode_ms = _decode_probe_ms(model, vocab_size=int(cfg.vocab_size), block_size=int(cfg.block_size))
         rows.append(
             {
@@ -117,11 +138,13 @@ def main() -> None:
     ap.add_argument("--repo", required=True, help="Path to RecursiveLLM repo")
     ap.add_argument("--steps", type=int, default=64)
     ap.add_argument("--block-size", type=int, default=32)
+    ap.add_argument("--step-offset", type=int, default=0)
     ap.add_argument("--seeds", nargs="+", type=int, default=[1337, 1338])
     ap.add_argument("--config-v2", default="")
     ap.add_argument("--config-v3", default="")
     ap.add_argument("--v2-overrides-json", default="")
     ap.add_argument("--v3-overrides-json", default="")
+    ap.add_argument("--optimizer-overrides-json", default="")
     ap.add_argument("--out", default="")
     args = ap.parse_args()
 
@@ -146,15 +169,36 @@ def main() -> None:
     cfg_v3 = _load_cfg(config_cls, cfg_v3_path, vocab_size=vocab_size, block_size=args.block_size)
     cfg_v2 = _apply_overrides(cfg_v2, json.loads(args.v2_overrides_json) if args.v2_overrides_json else None)
     cfg_v3 = _apply_overrides(cfg_v3, json.loads(args.v3_overrides_json) if args.v3_overrides_json else None)
+    optimizer_overrides = json.loads(args.optimizer_overrides_json) if args.optimizer_overrides_json else None
 
     payload = {
         "repo": str(repo),
         "steps": int(args.steps),
         "block_size": int(args.block_size),
+        "step_offset": int(args.step_offset),
         "seeds": [int(s) for s in args.seeds],
+        "optimizer_overrides": optimizer_overrides or {},
         "results": {
-            "model3_v2": _run_variant(model_cls, cfg_v2, train_data, val_data, steps=int(args.steps), seeds=[int(s) for s in args.seeds]),
-            "model3_v3": _run_variant(model_cls, cfg_v3, train_data, val_data, steps=int(args.steps), seeds=[int(s) for s in args.seeds]),
+            "model3_v2": _run_variant(
+                model_cls,
+                cfg_v2,
+                train_data,
+                val_data,
+                steps=int(args.steps),
+                step_offset=int(args.step_offset),
+                seeds=[int(s) for s in args.seeds],
+                optimizer_overrides=optimizer_overrides,
+            ),
+            "model3_v3": _run_variant(
+                model_cls,
+                cfg_v3,
+                train_data,
+                val_data,
+                steps=int(args.steps),
+                step_offset=int(args.step_offset),
+                seeds=[int(s) for s in args.seeds],
+                optimizer_overrides=optimizer_overrides,
+            ),
         },
     }
     text = json.dumps(payload, indent=2) + "\n"

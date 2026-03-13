@@ -2,62 +2,70 @@
 from __future__ import annotations
 
 import argparse
+import copy
+import hashlib
 import json
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
 
-QUEUE = [
-    {
-        "name": "single_proposal",
-        "description": "workspace_num_proposals=1 to reduce proposal softmax overhead",
-        "v2_overrides": {
-            "workspace_num_proposals": 1,
-            "workspace_proposal_temp": 1.0,
-        },
-    },
-    {
-        "name": "single_proposal_no_collapse",
-        "description": "single proposal plus remove collapse regularizer tax",
-        "v2_overrides": {
-            "workspace_num_proposals": 1,
-            "workspace_proposal_temp": 1.0,
-            "workspace_collapse_weight": 0.0,
-        },
-    },
-    {
-        "name": "sparse_teacher",
-        "description": "critic_sparse planner teacher on v2",
-        "v2_overrides": {
-            "planner_teacher_mode": "critic_sparse",
-            "planner_probe_mode": "first_last",
-            "planner_calibration_interval": 1024,
-        },
-    },
-    {
-        "name": "summary_rich",
-        "description": "richer frontier summaries for v2",
-        "v2_overrides": {
-            "frontier_summary_slots": 2,
-            "frontier_summary_tail_blend": 0.5,
-        },
-    },
-    {
-        "name": "single_proposal_sparse_teacher",
-        "description": "single proposal plus sparse planner teacher",
-        "v2_overrides": {
-            "workspace_num_proposals": 1,
-            "workspace_proposal_temp": 1.0,
-            "planner_teacher_mode": "critic_sparse",
-            "planner_probe_mode": "first_last",
-            "planner_calibration_interval": 1024,
-        },
-    },
-]
+DEFAULT_QUEUE_PATH = Path(__file__).with_name("experiment_queue_recursivellm_v2.json")
 
 
-def _run_bakeoff(repo: Path, *, steps: int, seeds: list[int], out_path: Path, v2_overrides: dict[str, object]) -> dict:
+def _stable_json(payload: object) -> str:
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"))
+
+
+def _load_queue(path: Path) -> tuple[dict[str, object], list[dict[str, object]]]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if isinstance(payload, list):
+        return {}, [dict(item) for item in payload]
+    if isinstance(payload, dict):
+        defaults = dict(payload.get("defaults", {}))
+        queue = [dict(item) for item in payload.get("queue", [])]
+        return defaults, queue
+    raise ValueError(f"unsupported queue payload in {path}")
+
+
+def _merge_dicts(*parts: dict[str, object] | None) -> dict[str, object]:
+    out: dict[str, object] = {}
+    for part in parts:
+        if part:
+            out.update(dict(part))
+    return out
+
+
+def _resolve_scalar(
+    item: dict[str, object],
+    defaults: dict[str, object],
+    cli_value: int | None,
+    key: str,
+    fallback: int,
+) -> int:
+    if key in item:
+        return int(item[key])
+    if cli_value is not None:
+        return int(cli_value)
+    if key in defaults:
+        return int(defaults[key])
+    return int(fallback)
+
+
+def _run_bakeoff(
+    repo: Path,
+    *,
+    steps: int,
+    block_size: int,
+    step_offset: int,
+    seeds: list[int],
+    out_path: Path,
+    v2_overrides: dict[str, object],
+    v3_overrides: dict[str, object],
+    optimizer_overrides: dict[str, object],
+    config_v2: str,
+    config_v3: str,
+) -> dict:
     cmd = [
         "python",
         str(Path(__file__).with_name("run_recursivellm_bakeoff.py")),
@@ -65,11 +73,23 @@ def _run_bakeoff(repo: Path, *, steps: int, seeds: list[int], out_path: Path, v2
         str(repo),
         "--steps",
         str(int(steps)),
+        "--block-size",
+        str(int(block_size)),
+        "--step-offset",
+        str(int(step_offset)),
+        "--v2-overrides-json",
+        _stable_json(v2_overrides),
+        "--v3-overrides-json",
+        _stable_json(v3_overrides),
+        "--optimizer-overrides-json",
+        _stable_json(optimizer_overrides),
         "--out",
         str(out_path),
-        "--v2-overrides-json",
-        json.dumps(v2_overrides),
     ]
+    if config_v2:
+        cmd.extend(["--config-v2", config_v2])
+    if config_v3:
+        cmd.extend(["--config-v3", config_v3])
     if seeds:
         cmd.extend(["--seeds", *[str(s) for s in seeds]])
     subprocess.run(cmd, check=True)
@@ -107,50 +127,231 @@ def _append_result(results_path: Path, *, commit: str, candidate: dict, status: 
         handle.write(row)
 
 
+def _filter_queue(
+    queue: list[dict[str, object]],
+    *,
+    stages: set[str],
+    tags: set[str],
+) -> list[dict[str, object]]:
+    out: list[dict[str, object]] = []
+    for item in queue:
+        if item.get("enabled", True) is False:
+            continue
+        item_stage = str(item.get("stage", "default"))
+        item_tags = {str(tag) for tag in item.get("tags", [])}
+        if stages and item_stage not in stages:
+            continue
+        if tags and not (item_tags & tags):
+            continue
+        out.append(item)
+    out.sort(key=lambda item: (-int(item.get("priority", 0)), str(item.get("stage", "")), str(item.get("name", ""))))
+    return out
+
+
+def _baseline_context_key(
+    *,
+    steps: int,
+    block_size: int,
+    step_offset: int,
+    seeds: list[int],
+    optimizer_overrides: dict[str, object],
+    v3_overrides: dict[str, object],
+    config_v2: str,
+    config_v3: str,
+) -> str:
+    payload = {
+        "steps": int(steps),
+        "block_size": int(block_size),
+        "step_offset": int(step_offset),
+        "seeds": [int(s) for s in seeds],
+        "optimizer_overrides": optimizer_overrides,
+        "v3_overrides": v3_overrides,
+        "config_v2": config_v2,
+        "config_v3": config_v3,
+    }
+    return hashlib.sha1(_stable_json(payload).encode("utf-8")).hexdigest()[:12]
+
+
+def _print_queue(queue: list[dict[str, object]]) -> None:
+    for item in queue:
+        payload = {
+            "stage": item.get("stage", "default"),
+            "priority": item.get("priority", 0),
+            "name": item.get("name"),
+            "tags": item.get("tags", []),
+            "description": item.get("description", ""),
+        }
+        print(json.dumps(payload, ensure_ascii=True))
+
+
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Automatic screen for RecursiveLLM model3_v2 config hypotheses.")
+    ap = argparse.ArgumentParser(description="Automatic screen for RecursiveLLM model3_v2 hypotheses.")
     ap.add_argument("--repo", required=True)
-    ap.add_argument("--steps", type=int, default=32, help="screening steps")
-    ap.add_argument("--final-steps", type=int, default=64, help="confirmation steps for keep candidates")
+    ap.add_argument("--queue-file", default=str(DEFAULT_QUEUE_PATH))
+    ap.add_argument("--steps", type=int, default=None, help="screening steps; queue default if omitted")
+    ap.add_argument("--final-steps", type=int, default=None, help="confirmation steps; queue default if omitted")
+    ap.add_argument("--block-size", type=int, default=None, help="bakeoff block size; queue default if omitted")
+    ap.add_argument("--step-offset", type=int, default=None, help="global training-step offset; queue default if omitted")
     ap.add_argument("--seeds", nargs="+", type=int, default=[1337, 1338])
+    ap.add_argument("--stage", action="append", default=[], help="only run queue items from this stage; repeatable")
+    ap.add_argument("--tag", action="append", default=[], help="only run queue items with any of these tags; repeatable")
     ap.add_argument("--limit", type=int, default=0, help="limit number of queued candidates, 0 = all")
+    ap.add_argument("--list", action="store_true", help="print queue and exit")
+    ap.add_argument("--optimizer-overrides-json", default="", help="global optimizer overrides merged into all queue items")
+    ap.add_argument("--config-v2", default="")
+    ap.add_argument("--config-v3", default="")
     args = ap.parse_args()
 
     repo = Path(args.repo).resolve()
     root = Path(__file__).resolve().parent
     results_path = root / "results.tsv"
-    baseline_out = root / "auto_baseline.json"
-    baseline = _run_bakeoff(repo, steps=int(args.steps), seeds=[int(s) for s in args.seeds], out_path=baseline_out, v2_overrides={})
-    commit = subprocess.check_output(["git", "-C", str(repo), "rev-parse", "--short", "HEAD"], text=True).strip()
+    queue_path = Path(args.queue_file).resolve()
+    queue_defaults, raw_queue = _load_queue(queue_path)
+    queue = _filter_queue(raw_queue, stages={str(s) for s in args.stage}, tags={str(t) for t in args.tag})
+    if int(args.limit) > 0:
+        queue = queue[: int(args.limit)]
 
-    queue = QUEUE[: int(args.limit)] if int(args.limit) > 0 else QUEUE
-    kept = []
+    if args.list:
+        _print_queue(queue)
+        return
+
+    commit = subprocess.check_output(["git", "-C", str(repo), "rev-parse", "--short", "HEAD"], text=True).strip()
+    global_optimizer = json.loads(args.optimizer_overrides_json) if args.optimizer_overrides_json else {}
+    screen_steps_default = int(queue_defaults.get("steps", 16))
+    final_steps_default = int(queue_defaults.get("final_steps", 32))
+    block_size_default = int(queue_defaults.get("block_size", 32))
+    step_offset_default = int(queue_defaults.get("step_offset", 0))
+    optimizer_defaults = dict(queue_defaults.get("optimizer_overrides", {}))
+    baselines: dict[str, dict] = {}
+
+    def get_baseline(
+        *,
+        steps: int,
+        block_size: int,
+        step_offset: int,
+        optimizer_overrides: dict[str, object],
+        v3_overrides: dict[str, object],
+    ) -> dict:
+        key = _baseline_context_key(
+            steps=steps,
+            block_size=block_size,
+            step_offset=step_offset,
+            seeds=[int(s) for s in args.seeds],
+            optimizer_overrides=optimizer_overrides,
+            v3_overrides=v3_overrides,
+            config_v2=args.config_v2,
+            config_v3=args.config_v3,
+        )
+        if key not in baselines:
+            out_path = root / f"auto_baseline_{key}.json"
+            baselines[key] = _run_bakeoff(
+                repo,
+                steps=steps,
+                block_size=block_size,
+                step_offset=step_offset,
+                seeds=[int(s) for s in args.seeds],
+                out_path=out_path,
+                v2_overrides={},
+                v3_overrides=v3_overrides,
+                optimizer_overrides=optimizer_overrides,
+                config_v2=args.config_v2,
+                config_v3=args.config_v3,
+            )
+        return baselines[key]
+
+    kept: list[dict[str, object]] = []
     for idx, item in enumerate(queue):
+        screen_steps = _resolve_scalar(item, queue_defaults, args.steps, "screen_steps", screen_steps_default)
+        final_steps = _resolve_scalar(item, queue_defaults, args.final_steps, "final_steps", final_steps_default)
+        block_size = _resolve_scalar(item, queue_defaults, args.block_size, "block_size", block_size_default)
+        step_offset = _resolve_scalar(item, queue_defaults, args.step_offset, "step_offset", step_offset_default)
+        optimizer_overrides = _merge_dicts(optimizer_defaults, global_optimizer, item.get("optimizer_overrides"))
+        v2_overrides = dict(item.get("v2_overrides", {}))
+        v3_overrides = dict(item.get("v3_overrides", {}))
+        baseline = get_baseline(
+            steps=screen_steps,
+            block_size=block_size,
+            step_offset=step_offset,
+            optimizer_overrides=optimizer_overrides,
+            v3_overrides=v3_overrides,
+        )
         out_path = root / f"auto_candidate_{idx}_{item['name']}.json"
         candidate = _run_bakeoff(
             repo,
-            steps=int(args.steps),
+            steps=screen_steps,
+            block_size=block_size,
+            step_offset=step_offset,
             seeds=[int(s) for s in args.seeds],
             out_path=out_path,
-            v2_overrides=dict(item["v2_overrides"]),
+            v2_overrides=v2_overrides,
+            v3_overrides=v3_overrides,
+            optimizer_overrides=optimizer_overrides,
+            config_v2=args.config_v2,
+            config_v3=args.config_v3,
         )
         status = _status(candidate, baseline)
-        _append_result(results_path, commit=commit, candidate=candidate, status=status, description=f"screen {item['name']}: {item['description']}")
+        description = (
+            f"screen [{item.get('stage', 'default')}] {item['name']}: "
+            f"{item.get('description', '')}"
+        )
+        _append_result(results_path, commit=commit, candidate=candidate, status=status, description=description)
         if status == "keep":
-            kept.append(item)
+            kept.append(
+                {
+                    "item": copy.deepcopy(item),
+                    "final_steps": final_steps,
+                    "block_size": block_size,
+                    "step_offset": step_offset,
+                    "optimizer_overrides": optimizer_overrides,
+                    "v3_overrides": v3_overrides,
+                }
+            )
 
-    for idx, item in enumerate(kept):
+    for idx, entry in enumerate(kept):
+        item = dict(entry["item"])
+        final_steps = int(entry["final_steps"])
+        block_size = int(entry["block_size"])
+        step_offset = int(entry["step_offset"])
+        optimizer_overrides = dict(entry["optimizer_overrides"])
+        v3_overrides = dict(entry["v3_overrides"])
+        baseline = get_baseline(
+            steps=final_steps,
+            block_size=block_size,
+            step_offset=step_offset,
+            optimizer_overrides=optimizer_overrides,
+            v3_overrides=v3_overrides,
+        )
         out_path = root / f"auto_final_{idx}_{item['name']}.json"
         candidate = _run_bakeoff(
             repo,
-            steps=int(args.final_steps),
+            steps=final_steps,
+            block_size=block_size,
+            step_offset=step_offset,
             seeds=[int(s) for s in args.seeds],
             out_path=out_path,
-            v2_overrides=dict(item["v2_overrides"]),
+            v2_overrides=dict(item.get("v2_overrides", {})),
+            v3_overrides=v3_overrides,
+            optimizer_overrides=optimizer_overrides,
+            config_v2=args.config_v2,
+            config_v3=args.config_v3,
         )
         status = _status(candidate, baseline)
-        _append_result(results_path, commit=commit, candidate=candidate, status=status, description=f"final {item['name']}: {item['description']}")
-        print(json.dumps({"name": item["name"], "status": status, "results": candidate["results"]["model3_v2"]}, indent=2))
+        description = (
+            f"final [{item.get('stage', 'default')}] {item['name']}: "
+            f"{item.get('description', '')}"
+        )
+        _append_result(results_path, commit=commit, candidate=candidate, status=status, description=description)
+        print(
+            json.dumps(
+                {
+                    "name": item["name"],
+                    "stage": item.get("stage", "default"),
+                    "status": status,
+                    "results": candidate["results"]["model3_v2"],
+                },
+                indent=2,
+            )
+        )
 
 
 if __name__ == "__main__":

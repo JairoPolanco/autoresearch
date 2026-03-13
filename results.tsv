@@ -5,3 +5,4 @@ timestamp	recursivellm_commit	v2_val_ce	v3_val_ce	v2_step_ms	v3_step_ms	v2_decod
 2026-03-13T02:43:13Z	a5dc8d5	10.050641	9.976113	49.44	87.14	18.76	24.79	keep	screen sparse_teacher: critic_sparse planner teacher on v2
 2026-03-13T02:43:26Z	a5dc8d5	9.275328	9.214907	47.95	85.60	17.63	25.06	keep	final single_proposal_no_collapse: single proposal plus remove collapse regularizer tax
 2026-03-13T02:43:39Z	a5dc8d5	9.276356	9.214907	49.13	85.52	18.46	25.06	keep	final sparse_teacher: critic_sparse planner teacher on v2
+2026-03-13T03:02:20Z	a5dc8d5	10.648135	10.537401	48.89	88.25	18.58	28.26	discard	screen [control_teacher] sparse_teacher_first_last: Replace dense exact planner teacher with sparse critic calibration on first/last loops.

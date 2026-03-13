@@ -16,6 +16,11 @@ Secondary success criteria:
 
 Do not accept quality wins that come with disproportionate train-time regressions unless they materially improve the long-run architecture ceiling.
 
+Companion files:
+- `research_notes_mar2026.md` — primary-source idea notes
+- `experiment_catalog_recursivellm_v2.md` — full backlog, priorities, and stop rules
+- `experiment_queue_recursivellm_v2.json` — machine-readable overnight queue
+
 ## Scope
 
 Work in this target repo:
@@ -86,3 +91,27 @@ Status:
 - Treat `model3_v3` as a frontier reference, not the main branch.
 - Prefer exact optimizations and mathematically clean changes over speculative mechanism growth.
 - Start from the hypotheses in `research_notes_mar2026.md` before inventing new mechanisms.
+- For unattended runs, use the queue runner instead of editing the hardcoded list:
+
+```bash
+python auto_recursivellm_v2_search.py \
+  --repo /Users/jairopolanco/Projects/RecursiveLLM \
+  --queue-file /Users/jairopolanco/Projects/autoresearch/experiment_queue_recursivellm_v2.json \
+  --steps 16 \
+  --final-steps 32 \
+  --seeds 1337 1338
+```
+
+- Run focused stages first:
+
+```bash
+python auto_recursivellm_v2_search.py \
+  --repo /Users/jairopolanco/Projects/RecursiveLLM \
+  --queue-file /Users/jairopolanco/Projects/autoresearch/experiment_queue_recursivellm_v2.json \
+  --stage control_teacher \
+  --stage budget \
+  --stage workspace \
+  --steps 16 \
+  --final-steps 32 \
+  --seeds 1337 1338
+```
