@@ -1,0 +1,2 @@
+timestamp	recursivellm_commit	v2_val_ce	v3_val_ce	v2_step_ms	v3_step_ms	status	description
+2026-03-13T02:21:44Z	a5dc8d5	8.587618	8.607483	49.19	89.19	keep	baseline current RecursiveLLM model3_v2 vs model3_v3 bakeoff
