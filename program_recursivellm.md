@@ -21,6 +21,14 @@ Companion files:
 - `experiment_catalog_recursivellm_v2.md` — full backlog, priorities, and stop rules
 - `experiment_queue_recursivellm_v2.json` — machine-readable overnight queue
 
+Current promoted `model3_v2` base:
+- `workspace_num_proposals = 1`
+- `workspace_proposal_temp = 1.0`
+- `workspace_collapse_weight = 0.0`
+- `workspace_mlp_mult = 1`
+
+The next automatic search should treat those as the fixed base and primarily search interactions on top.
+
 ## Scope
 
 Work in this target repo:
@@ -91,6 +99,7 @@ Status:
 - Treat `model3_v3` as a frontier reference, not the main branch.
 - Prefer exact optimizations and mathematically clean changes over speculative mechanism growth.
 - Start from the hypotheses in `research_notes_mar2026.md` before inventing new mechanisms.
+- Prefer stacking confirmed winners before reviving discarded singles.
 - For unattended runs, use the queue runner instead of editing the hardcoded list:
 
 ```bash
@@ -103,14 +112,15 @@ python auto_recursivellm_v2_search.py \
 ```
 
 - Run focused stages first:
+- Run focused winner-stacking and chunking stages first:
 
 ```bash
 python auto_recursivellm_v2_search.py \
   --repo /Users/jairopolanco/Projects/RecursiveLLM \
   --queue-file /Users/jairopolanco/Projects/autoresearch/experiment_queue_recursivellm_v2.json \
-  --stage control_teacher \
-  --stage budget \
-  --stage workspace \
+  --stage winner_interactions \
+  --stage chunking \
+  --stage control_round2 \
   --steps 16 \
   --final-steps 32 \
   --seeds 1337 1338

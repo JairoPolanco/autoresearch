@@ -6,3 +6,81 @@ timestamp	recursivellm_commit	v2_val_ce	v3_val_ce	v2_step_ms	v3_step_ms	v2_decod
 2026-03-13T02:43:26Z	a5dc8d5	9.275328	9.214907	47.95	85.60	17.63	25.06	keep	final single_proposal_no_collapse: single proposal plus remove collapse regularizer tax
 2026-03-13T02:43:39Z	a5dc8d5	9.276356	9.214907	49.13	85.52	18.46	25.06	keep	final sparse_teacher: critic_sparse planner teacher on v2
 2026-03-13T03:02:20Z	a5dc8d5	10.648135	10.537401	48.89	88.25	18.58	28.26	discard	screen [control_teacher] sparse_teacher_first_last: Replace dense exact planner teacher with sparse critic calibration on first/last loops.
+2026-03-13T03:05:49Z	a5dc8d5	10.057383	9.976113	51.98	106.87	19.54	28.68	discard	screen [control_teacher] sparse_teacher_first_last: Replace dense exact planner teacher with sparse critic calibration on first/last loops.
+2026-03-13T03:05:59Z	a5dc8d5	10.057383	9.976113	53.83	93.19	19.06	26.10	discard	screen [control_teacher] sparse_teacher_stride2: Sparse critic teacher plus stride-2 block probes to cut supervision cost further.
+2026-03-13T03:06:08Z	a5dc8d5	10.057383	9.976113	52.02	93.54	18.87	26.79	discard	screen [control_teacher] sparse_teacher_stride4: More aggressive stride-4 sparse planner probes.
+2026-03-13T03:06:18Z	a5dc8d5	10.057383	9.976113	50.31	96.72	19.10	27.03	keep	screen [control_teacher] sparse_teacher_sampled_every2: Sampled sparse planner teacher every 2 loops.
+2026-03-13T03:06:28Z	a5dc8d5	10.057383	9.976113	53.10	96.35	19.37	27.48	discard	screen [control_teacher] sparse_teacher_sampled_every4: Sampled sparse planner teacher every 4 loops for maximal supervision savings.
+2026-03-13T03:06:38Z	a5dc8d5	10.039291	9.976113	53.93	90.36	19.52	25.24	keep	screen [control_teacher] sparse_teacher_no_halt: Sparse teacher with halt head removed to reduce redundant control heads.
+2026-03-13T03:06:48Z	a5dc8d5	10.057383	9.976113	56.28	96.18	20.03	24.69	discard	screen [control_teacher] sparse_teacher_with_k_head: Sparse teacher with explicit k-head supervision for active-block width.
+2026-03-13T03:06:57Z	a5dc8d5	10.057383	9.976113	48.53	82.60	17.60	24.92	keep	screen [control_teacher] sparse_teacher_with_loop_value: Sparse teacher plus explicit loop-value regression target.
+2026-03-13T03:07:06Z	a5dc8d5	10.059819	9.976113	48.54	86.69	17.23	24.32	keep	screen [control_teacher] sparse_teacher_low_compute_cost: Lower compute penalty to encourage planner to spend more recurrent compute.
+2026-03-13T03:07:15Z	a5dc8d5	10.058086	9.976113	48.56	85.48	17.18	39.88	keep	screen [control_teacher] sparse_teacher_high_compute_cost: Higher compute penalty to enforce more aggressive compute pruning.
+2026-03-13T03:07:24Z	a5dc8d5	10.049188	9.976113	45.21	85.04	54.94	25.01	keep	screen [budget] loops3: Reduce recurrent depth from 4 to 3 loops.
+2026-03-13T03:07:33Z	a5dc8d5	10.057478	9.976113	41.02	83.68	12.82	24.12	keep	screen [budget] loops2: Reduce recurrent depth from 4 to 2 loops for stronger throughput gains.
+2026-03-13T03:07:42Z	a5dc8d5	10.051322	9.976113	46.97	85.09	16.86	24.78	keep	screen [budget] frontier3: Shrink editable frontier from 4 blocks to 3 blocks.
+2026-03-13T03:07:50Z	a5dc8d5	10.071202	9.976113	46.65	83.32	17.07	24.93	discard	screen [budget] frontier2: Shrink editable frontier from 4 blocks to 2 blocks.
+2026-03-13T03:07:59Z	a5dc8d5	10.044446	9.976113	43.41	86.12	14.84	25.68	keep	screen [budget] loops3_frontier3: Jointly trim recurrent depth and editable frontier width.
+2026-03-13T03:08:08Z	a5dc8d5	10.052265	9.976113	40.00	84.84	12.45	24.35	keep	screen [budget] loops2_frontier2: Aggressively trim both loop count and frontier width.
+2026-03-13T03:08:17Z	a5dc8d5	10.053810	9.976113	48.54	82.78	17.66	25.13	keep	screen [budget] executor_min_active2: Force at least two active blocks to reduce over-pruning risk.
+2026-03-13T03:08:26Z	a5dc8d5	10.036546	9.976113	51.75	83.37	18.28	24.14	keep	screen [budget] dense_no_executor: Disable block executor and run dense frontier updates as a control.
+2026-03-13T03:08:34Z	a5dc8d5	10.026810	9.976113	48.90	82.69	17.13	24.58	keep	screen [workspace] workspace_slots4: Reduce workspace slots from 6 to 4 to improve throughput.
+2026-03-13T03:08:43Z	a5dc8d5	10.104298	9.976113	48.39	85.15	17.14	24.17	discard	screen [workspace] workspace_slots8: Increase workspace slots from 6 to 8 for more memory capacity.
+2026-03-13T03:08:52Z	a5dc8d5	10.001878	9.976113	47.26	83.50	17.33	24.46	keep	screen [workspace] workspace_mlp_mult1: Smaller editor/update hidden size via workspace_mlp_mult=1.
+2026-03-13T03:09:02Z	a5dc8d5	10.092767	9.976113	54.59	96.75	19.32	26.60	discard	screen [workspace] workspace_mlp_mult3: Larger editor/update hidden size via workspace_mlp_mult=3.
+2026-03-13T03:09:11Z	a5dc8d5	10.052861	9.976113	47.67	83.58	17.50	25.12	keep	screen [workspace] update_norm_low: Tighter workspace and token update clamps.
+2026-03-13T03:09:20Z	a5dc8d5	10.062353	9.976113	47.19	85.02	17.40	24.30	keep	screen [workspace] update_norm_high: Looser workspace and token update clamps.
+2026-03-13T03:09:29Z	a5dc8d5	10.058215	9.976113	47.66	96.14	17.77	24.64	keep	screen [workspace] collapse_tiny: Reintroduce a tiny workspace collapse penalty to stabilize slot diversity.
+2026-03-13T03:09:38Z	a5dc8d5	10.057383	9.976113	47.30	82.74	17.33	24.00	keep	screen [tape_summary] tape_recent8: Shorter exact tape window.
+2026-03-13T03:09:47Z	a5dc8d5	10.057383	9.976113	52.51	84.58	18.46	25.42	discard	screen [tape_summary] tape_recent32: Longer exact tape window.
+2026-03-13T03:09:55Z	a5dc8d5	10.057383	9.976113	47.65	82.60	17.12	24.23	keep	screen [tape_summary] tape_slots1: One tape slot per finalized block.
+2026-03-13T03:10:04Z	a5dc8d5	10.057383	9.976113	47.28	82.39	17.35	24.43	keep	screen [tape_summary] tape_slots4: Four tape slots per finalized block.
+2026-03-13T03:10:13Z	a5dc8d5	10.057383	9.976113	47.57	83.80	17.38	25.69	keep	screen [tape_summary] tape_coarse1: Use only one coarse tape level.
+2026-03-13T03:10:22Z	a5dc8d5	10.057383	9.976113	47.72	84.89	18.33	24.79	keep	screen [tape_summary] tape_coarse3: Use three coarse tape levels.
+2026-03-13T03:10:31Z	a5dc8d5	10.057383	9.976113	48.88	91.43	17.84	24.59	keep	screen [tape_summary] tape_detach_off: Allow tape appends to keep gradient ancestry instead of detached memory.
+2026-03-13T03:10:40Z	a5dc8d5	10.097433	9.976113	50.15	86.42	18.81	25.91	discard	screen [tape_summary] summary_slots2_tail025: Two frontier summary slots with a light tail-aware blend.
+2026-03-13T03:10:49Z	a5dc8d5	10.097433	9.976113	48.21	83.82	19.01	24.42	discard	screen [tape_summary] summary_slots2_tail050: Two frontier summary slots with a stronger tail-aware blend.
+2026-03-13T03:10:57Z	a5dc8d5	10.057383	9.976113	47.14	83.89	17.81	24.55	keep	screen [editor] editor_local_context: Enable causal intra-block local context in the token editor.
+2026-03-13T03:11:06Z	a5dc8d5	10.097433	9.976113	48.70	85.16	18.70	24.58	discard	screen [editor] summary_slots2_tail025_local: Combine light richer frontier summaries with local editor context.
+2026-03-13T03:11:15Z	a5dc8d5	10.097433	9.976113	49.01	83.33	18.45	24.12	discard	screen [editor] summary_slots2_tail050_local: Combine stronger tail-aware summaries with local editor context.
+2026-03-13T03:11:33Z	a5dc8d5	10.176615	10.101209	47.84	84.07	17.23	25.57	discard	screen [optimizer] lr_2e4: Lower learning rate to 2.0e-4.
+2026-03-13T03:11:51Z	a5dc8d5	9.913195	9.841554	46.90	84.20	16.92	24.35	discard	screen [optimizer] lr_3p3e4: Slightly higher learning rate at 3.3e-4.
+2026-03-13T03:12:08Z	a5dc8d5	9.636906	9.522939	47.44	83.17	20.50	23.98	discard	screen [optimizer] lr_5e4: Higher learning rate at 5.0e-4.
+2026-03-13T03:12:26Z	a5dc8d5	10.057301	9.976014	48.39	84.33	17.49	24.38	discard	screen [optimizer] wd_0p05: Lower weight decay.
+2026-03-13T03:12:43Z	a5dc8d5	10.057677	9.976311	46.56	82.48	17.12	23.93	discard	screen [optimizer] wd_0p2: Higher weight decay.
+2026-03-13T03:13:01Z	a5dc8d5	10.050784	9.969750	47.47	84.52	17.55	24.12	discard	screen [optimizer] beta2_099: Slower second-moment decay.
+2026-03-13T03:13:18Z	a5dc8d5	10.075507	9.989630	47.40	82.85	17.29	24.42	discard	screen [optimizer] betas_095_099: Heavier optimizer memory with beta1=0.95 beta2=0.99.
+2026-03-13T03:13:27Z	a5dc8d5	9.913195	9.841554	52.18	85.11	17.20	24.16	discard	screen [optimizer] lr_3p3e4_sparse_teacher: Higher LR combined with sparse planner teacher.
+2026-03-13T03:13:36Z	a5dc8d5	10.404376	9.976113	48.09	83.32	17.66	24.33	discard	screen [substrate] rope_only: Switch token backbone from absolute positions to RoPE.
+2026-03-13T03:13:44Z	a5dc8d5	10.122532	9.976113	48.67	83.71	17.32	23.90	discard	screen [substrate] swiglu_only: Switch token FFN from GELU to SwiGLU.
+2026-03-13T03:13:53Z	a5dc8d5	10.024136	9.976113	47.34	85.36	17.07	24.39	keep	screen [substrate] gqa_only_kv2: Enable grouped-query attention with 2 KV heads.
+2026-03-13T03:14:02Z	a5dc8d5	10.550900	9.976113	49.27	86.41	17.41	23.98	discard	screen [substrate] rope_gqa_swiglu: Full modernized token backbone: RoPE + GQA + SwiGLU.
+2026-03-13T03:14:11Z	a5dc8d5	10.046476	9.976113	49.17	84.39	17.91	24.76	keep	screen [interactions] two_proposals_sparse_teacher: Re-test two proposal deltas only in the cheaper sparse-teacher regime.
+2026-03-13T03:14:37Z	a5dc8d5	9.275328	9.214907	48.61	84.25	17.98	24.43	discard	final [control_teacher] sparse_teacher_sampled_every2: Sampled sparse planner teacher every 2 loops.
+2026-03-13T03:14:50Z	a5dc8d5	9.252343	9.214907	48.14	83.43	17.42	23.95	keep	final [control_teacher] sparse_teacher_no_halt: Sparse teacher with halt head removed to reduce redundant control heads.
+2026-03-13T03:15:03Z	a5dc8d5	9.275328	9.214907	47.43	82.98	17.40	24.28	discard	final [control_teacher] sparse_teacher_with_loop_value: Sparse teacher plus explicit loop-value regression target.
+2026-03-13T03:15:15Z	a5dc8d5	9.276188	9.214907	46.63	82.76	17.26	23.75	discard	final [control_teacher] sparse_teacher_low_compute_cost: Lower compute penalty to encourage planner to spend more recurrent compute.
+2026-03-13T03:15:28Z	a5dc8d5	9.273857	9.214907	46.90	84.55	17.09	23.71	discard	final [control_teacher] sparse_teacher_high_compute_cost: Higher compute penalty to enforce more aggressive compute pruning.
+2026-03-13T03:15:41Z	a5dc8d5	9.268847	9.214907	43.54	84.75	14.74	24.27	keep	final [budget] loops3: Reduce recurrent depth from 4 to 3 loops.
+2026-03-13T03:15:54Z	a5dc8d5	9.281083	9.214907	39.19	83.34	11.91	24.15	keep	final [budget] loops2: Reduce recurrent depth from 4 to 2 loops for stronger throughput gains.
+2026-03-13T03:16:07Z	a5dc8d5	9.270561	9.214907	47.46	83.13	17.54	23.87	discard	final [budget] frontier3: Shrink editable frontier from 4 blocks to 3 blocks.
+2026-03-13T03:16:20Z	a5dc8d5	9.277052	9.214907	42.95	83.78	14.56	23.99	keep	final [budget] loops3_frontier3: Jointly trim recurrent depth and editable frontier width.
+2026-03-13T03:16:32Z	a5dc8d5	9.306198	9.214907	39.26	83.35	12.25	24.39	discard	final [budget] loops2_frontier2: Aggressively trim both loop count and frontier width.
+2026-03-13T03:16:45Z	a5dc8d5	9.265631	9.214907	47.21	83.30	17.54	23.97	discard	final [budget] executor_min_active2: Force at least two active blocks to reduce over-pruning risk.
+2026-03-13T03:16:58Z	a5dc8d5	9.252982	9.214907	47.53	84.43	18.09	24.35	keep	final [budget] dense_no_executor: Disable block executor and run dense frontier updates as a control.
+2026-03-13T03:17:11Z	a5dc8d5	9.250151	9.214907	46.55	83.14	17.33	24.08	keep	final [workspace] workspace_slots4: Reduce workspace slots from 6 to 4 to improve throughput.
+2026-03-13T03:17:24Z	a5dc8d5	9.239932	9.214907	46.19	83.69	16.85	23.99	keep	final [workspace] workspace_mlp_mult1: Smaller editor/update hidden size via workspace_mlp_mult=1.
+2026-03-13T03:17:36Z	a5dc8d5	9.267634	9.214907	47.68	83.82	16.96	24.24	discard	final [workspace] update_norm_low: Tighter workspace and token update clamps.
+2026-03-13T03:17:50Z	a5dc8d5	9.276213	9.214907	47.29	83.46	17.33	24.14	discard	final [workspace] update_norm_high: Looser workspace and token update clamps.
+2026-03-13T03:18:03Z	a5dc8d5	9.276161	9.214907	47.03	83.01	17.10	24.51	discard	final [workspace] collapse_tiny: Reintroduce a tiny workspace collapse penalty to stabilize slot diversity.
+2026-03-13T03:18:15Z	a5dc8d5	9.275328	9.214907	46.93	83.23	17.21	23.87	discard	final [tape_summary] tape_recent8: Shorter exact tape window.
+2026-03-13T03:18:28Z	a5dc8d5	9.275328	9.214907	47.11	84.46	17.98	24.15	discard	final [tape_summary] tape_slots1: One tape slot per finalized block.
+2026-03-13T03:18:41Z	a5dc8d5	9.275328	9.214907	46.77	84.00	17.08	24.22	discard	final [tape_summary] tape_slots4: Four tape slots per finalized block.
+2026-03-13T03:18:55Z	a5dc8d5	9.275328	9.214907	47.04	83.81	17.54	24.87	discard	final [tape_summary] tape_coarse1: Use only one coarse tape level.
+2026-03-13T03:19:08Z	a5dc8d5	9.275328	9.214907	47.44	82.64	17.50	23.88	discard	final [tape_summary] tape_coarse3: Use three coarse tape levels.
+2026-03-13T03:19:21Z	a5dc8d5	9.275328	9.214907	47.10	83.74	17.14	23.97	discard	final [tape_summary] tape_detach_off: Allow tape appends to keep gradient ancestry instead of detached memory.
+2026-03-13T03:19:33Z	a5dc8d5	9.275328	9.214907	47.37	83.21	17.72	23.86	discard	final [editor] editor_local_context: Enable causal intra-block local context in the token editor.
+2026-03-13T03:19:47Z	a5dc8d5	9.263844	9.214907	47.47	84.63	17.34	23.79	keep	final [substrate] gqa_only_kv2: Enable grouped-query attention with 2 KV heads.
+2026-03-13T03:20:00Z	a5dc8d5	9.272191	9.214907	48.20	83.06	18.21	23.78	discard	final [interactions] two_proposals_sparse_teacher: Re-test two proposal deltas only in the cheaper sparse-teacher regime.
+2026-03-13T07:09:07Z	a5dc8d5	10.662520	10.537401	48.90	89.91	18.13	27.93	keep	screen [winner_interactions] slots4: Layer the workspace_slots=4 win on top of the promoted smaller MLP baseline.
+2026-03-13T07:09:20Z	a5dc8d5	10.412103	10.331681	48.26	92.65	17.69	24.46	keep	final [winner_interactions] slots4: Layer the workspace_slots=4 win on top of the promoted smaller MLP baseline.

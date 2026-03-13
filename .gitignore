@@ -21,3 +21,9 @@ dev/
 
 # Results file
 results.tsv
+
+# RecursiveLLM autoresearch run artifacts
+auto_baseline_*.json
+auto_candidate_*.json
+auto_final_*.json
+overnight_run_*.log

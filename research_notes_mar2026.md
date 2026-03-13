@@ -72,24 +72,49 @@ Mapping to `model3_v2`:
 Concrete hypothesis:
 - use this as justification to prefer hybrid recurrent-memory ideas over immediately expanding attention complexity
 
+## Evidence After Round 1
+
+Confirmed wins:
+- `workspace_num_proposals = 1`
+- `workspace_collapse_weight = 0.0`
+- `workspace_mlp_mult = 1`
+- `workspace_slots = 4`
+- `planner_teacher_mode = critic_sparse` with `planner_use_halt_head = False`
+- `n_loops = 3` and `n_loops = 2`
+- `n_kv_head = 2`
+
+Confirmed weak or losing singles:
+- RoPE
+- SwiGLU
+- richer tape-only changes
+- local editor context as a standalone single
+
+Interpretation:
+- the branch still wants cheaper recurrent memory and cheaper control, not a larger or fancier trunk
+- the next serious question is whether the winners compound
+
 ## Highest-ROI Hypothesis Queue for Model3 V2
 
-1. **Learned workspace carry / write strength**
+1. **Winner stacking**
+- Stack `workspace_slots=4`, `n_loops=3`, sparse no-halt teacher, and `n_kv_head=2`
+- Goal: find the best combined quality/QPF point
+
+2. **Chunking / frontier discretization**
+- Vary `workspace_block_tokens` and `workspace_frontier_blocks` while preserving or intentionally shrinking frontier token budget
+- Goal: test whether `v2` is paying for the wrong block granularity
+
+3. **Learned workspace carry / write strength**
 - Add a learned gate in `WorkspaceCell` over update magnitude or carry
 - Goal: better memory retention vs overwrite without extra loops
 
-2. **Replace proposal mixtures with a cheaper gated-delta update**
-- Try `workspace_num_proposals=1`
-- Add a more structured gated write instead of proposal softmax mixing
-- Goal: better QPF than proposal mixtures
+4. **Replace proposal mixtures with a cheaper gated-delta update**
+- Single-proposal mode is already the new base
+- Next step is a more structured gated write instead of proposal softmax mixing
+- Goal: better QPF than the current generic update MLP
 
-3. **Planner normalization and tiny-frontier fast paths**
-- Keep harvesting exact low-risk compute savings in planner/editor hot paths
-- Goal: make `v2` even cheaper while preserving quality
-
-4. **Selective richer summaries only if they help `v2`**
-- `v3` showed mild gains from richer frontier summaries
-- check whether a light summary enrichment helps `v2` without importing v3 complexity
+5. **Selective richer summaries only if they help the winner stack**
+- Retry light summary enrichment only on top of already-good profiles
+- Goal: preserve more frontier signal without importing `v3`'s cost structure
 
 ## Anti-Goals
 

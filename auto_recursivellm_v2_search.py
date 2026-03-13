@@ -36,6 +36,13 @@ def _merge_dicts(*parts: dict[str, object] | None) -> dict[str, object]:
     return out
 
 
+def _with_base_overrides(base: dict[str, object], delta: dict[str, object] | None) -> dict[str, object]:
+    out = dict(base)
+    if delta:
+        out.update(dict(delta))
+    return out
+
+
 def _resolve_scalar(
     item: dict[str, object],
     defaults: dict[str, object],
@@ -154,6 +161,7 @@ def _baseline_context_key(
     block_size: int,
     step_offset: int,
     seeds: list[int],
+    base_v2_overrides: dict[str, object],
     optimizer_overrides: dict[str, object],
     v3_overrides: dict[str, object],
     config_v2: str,
@@ -164,6 +172,7 @@ def _baseline_context_key(
         "block_size": int(block_size),
         "step_offset": int(step_offset),
         "seeds": [int(s) for s in seeds],
+        "base_v2_overrides": base_v2_overrides,
         "optimizer_overrides": optimizer_overrides,
         "v3_overrides": v3_overrides,
         "config_v2": config_v2,
@@ -222,6 +231,8 @@ def main() -> None:
     block_size_default = int(queue_defaults.get("block_size", 32))
     step_offset_default = int(queue_defaults.get("step_offset", 0))
     optimizer_defaults = dict(queue_defaults.get("optimizer_overrides", {}))
+    base_v2_overrides_defaults = dict(queue_defaults.get("base_v2_overrides", {}))
+    base_v3_overrides_defaults = dict(queue_defaults.get("base_v3_overrides", {}))
     baselines: dict[str, dict] = {}
 
     def get_baseline(
@@ -229,6 +240,7 @@ def main() -> None:
         steps: int,
         block_size: int,
         step_offset: int,
+        base_v2_overrides: dict[str, object],
         optimizer_overrides: dict[str, object],
         v3_overrides: dict[str, object],
     ) -> dict:
@@ -237,6 +249,7 @@ def main() -> None:
             block_size=block_size,
             step_offset=step_offset,
             seeds=[int(s) for s in args.seeds],
+            base_v2_overrides=base_v2_overrides,
             optimizer_overrides=optimizer_overrides,
             v3_overrides=v3_overrides,
             config_v2=args.config_v2,
@@ -251,7 +264,7 @@ def main() -> None:
                 step_offset=step_offset,
                 seeds=[int(s) for s in args.seeds],
                 out_path=out_path,
-                v2_overrides={},
+                v2_overrides=base_v2_overrides,
                 v3_overrides=v3_overrides,
                 optimizer_overrides=optimizer_overrides,
                 config_v2=args.config_v2,
@@ -266,12 +279,14 @@ def main() -> None:
         block_size = _resolve_scalar(item, queue_defaults, args.block_size, "block_size", block_size_default)
         step_offset = _resolve_scalar(item, queue_defaults, args.step_offset, "step_offset", step_offset_default)
         optimizer_overrides = _merge_dicts(optimizer_defaults, global_optimizer, item.get("optimizer_overrides"))
-        v2_overrides = dict(item.get("v2_overrides", {}))
-        v3_overrides = dict(item.get("v3_overrides", {}))
+        base_v2_overrides = _with_base_overrides(base_v2_overrides_defaults, item.get("base_v2_overrides"))
+        v2_overrides = _with_base_overrides(base_v2_overrides, item.get("v2_overrides"))
+        v3_overrides = _with_base_overrides(base_v3_overrides_defaults, item.get("v3_overrides"))
         baseline = get_baseline(
             steps=screen_steps,
             block_size=block_size,
             step_offset=step_offset,
+            base_v2_overrides=base_v2_overrides,
             optimizer_overrides=optimizer_overrides,
             v3_overrides=v3_overrides,
         )
@@ -302,6 +317,7 @@ def main() -> None:
                     "final_steps": final_steps,
                     "block_size": block_size,
                     "step_offset": step_offset,
+                    "base_v2_overrides": base_v2_overrides,
                     "optimizer_overrides": optimizer_overrides,
                     "v3_overrides": v3_overrides,
                 }
@@ -312,12 +328,14 @@ def main() -> None:
         final_steps = int(entry["final_steps"])
         block_size = int(entry["block_size"])
         step_offset = int(entry["step_offset"])
+        base_v2_overrides = dict(entry["base_v2_overrides"])
         optimizer_overrides = dict(entry["optimizer_overrides"])
         v3_overrides = dict(entry["v3_overrides"])
         baseline = get_baseline(
             steps=final_steps,
             block_size=block_size,
             step_offset=step_offset,
+            base_v2_overrides=base_v2_overrides,
             optimizer_overrides=optimizer_overrides,
             v3_overrides=v3_overrides,
         )
@@ -329,7 +347,7 @@ def main() -> None:
             step_offset=step_offset,
             seeds=[int(s) for s in args.seeds],
             out_path=out_path,
-            v2_overrides=dict(item.get("v2_overrides", {})),
+            v2_overrides=_with_base_overrides(base_v2_overrides, item.get("v2_overrides")),
             v3_overrides=v3_overrides,
             optimizer_overrides=optimizer_overrides,
             config_v2=args.config_v2,

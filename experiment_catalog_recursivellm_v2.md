@@ -44,6 +44,35 @@ Its likely remaining ceiling is not "add many more subsystems". It is:
 - improve token refinement only where it buys real quality
 - tighten the memory/summarization path without importing `v3`'s full cost structure
 
+### Confirmed Round-1 winners
+
+These are not guesses. They already won in the first overnight sweep.
+
+- Promoted into the live `v2` config:
+  - `workspace_num_proposals = 1`
+  - `workspace_proposal_temp = 1.0`
+  - `workspace_collapse_weight = 0.0`
+  - `workspace_mlp_mult = 1`
+- Additional kept single experiments:
+  - `workspace_slots = 4`
+  - `planner_teacher_mode=critic_sparse` + `planner_use_halt_head=False`
+  - `n_loops = 3`
+  - `n_loops = 2`
+  - `n_kv_head = 2`
+
+### Confirmed Round-1 losers
+
+These should not be rerun as isolated singles unless the base changes materially.
+
+- RoPE only
+- SwiGLU only
+- full `RoPE + GQA + SwiGLU`
+- tape-only changes (`tape_recent`, `tape_slots`, `tape_coarse`, `tape_detach_off`)
+- two-proposal revival under sparse teacher
+- local editor context as a standalone single
+- clamp retunes and tiny collapse regularization
+- most raw optimizer-only sweeps
+
 ## Primary-Source Inspirations
 
 These are included only as idea sources, not as mandates.
@@ -69,28 +98,33 @@ These are included only as idea sources, not as mandates.
 - Kimi Linear
   - https://arxiv.org/abs/2510.26692
   - motivates decode-efficient chunkwise recurrent/linear hybrids, but only as a long-range inspiration
+- Adaptive Parallel Reasoning
+  - https://arxiv.org/abs/2504.15466
+  - motivates multiple cheap reasoning trajectories only if they actually beat single-trajectory recurrent updates on QPF
+- Learning to Skip
+  - https://arxiv.org/abs/2311.15436
+  - motivates compute gating tied to measurable utility rather than decorative routing losses
+- Long-context token mixing with recent/cache/state decomposition
+  - use as a design pattern, not a mandate, for future tape-source routing and recent-vs-coarse memory balance
 
 ## Automatic Research Strategy
 
 Run the queue in layers, not all at once:
 
-1. `control_teacher`
-   - highest ROI
-   - attacks planner/probe cost directly
-2. `budget`
-   - trims loop count and frontier width
-3. `workspace`
-   - tunes capacity, clamp strength, and recurrent update complexity
-4. `tape_summary`
-   - memory/summarization tradeoffs
-5. `editor`
-   - higher-expressivity token refinement
-6. `optimizer`
-   - only after architecture-side easy wins are harvested
-7. `substrate`
-   - RoPE/GQA/SwiGLU and other backbone modernizations
-8. `interactions`
-   - only after winning singles are known
+1. `winner_interactions`
+   - compounds the confirmed winners from round 1
+2. `chunking`
+   - tests whether the block/frontier discretization itself is suboptimal
+3. `control_round2`
+   - revisits planner/control ideas only on top of the new promoted base
+4. `summary_editor_round2`
+   - retries richer summaries and local editor context only as interactions
+5. `substrate_variants`
+   - focuses on KV-head compression variants because GQA was the only substrate family that won
+6. `optimizer_round2`
+   - only around already-good structural variants
+7. `long_shots`
+   - only when the rest of the queue is exhausted
 
 Recommended overnight command:
 
@@ -99,9 +133,9 @@ cd /Users/jairopolanco/Projects/autoresearch
 python auto_recursivellm_v2_search.py \
   --repo /Users/jairopolanco/Projects/RecursiveLLM \
   --queue-file /Users/jairopolanco/Projects/autoresearch/experiment_queue_recursivellm_v2.json \
-  --stage control_teacher \
-  --stage budget \
-  --stage workspace \
+  --stage winner_interactions \
+  --stage chunking \
+  --stage control_round2 \
   --steps 16 \
   --final-steps 32 \
   --seeds 1337 1338
@@ -138,39 +172,44 @@ Files touched by the mechanism:
 - `ouroboros/model3/planner_v3.py`
 - `ouroboros/model3/config.py`
 
-Hypothesis:
-- the planner should learn from a cheaper sparse critic signal instead of dense exact CE probing
+Status:
+- sparse critic supervision already proved useful
+- the next question is whether it compounds with the structural winners
 
-Auto queue items:
-- sparse critic teacher with first/last loops
-- sparse critic with stride-2 or stride-4 block probes
-- sampled sparse probes every 2 or 4 loops
-- removing the halt head if it is redundant
-- turning on explicit `k_head` or loop-value supervision
-- changing planner compute cost
+Hypothesis:
+- the planner should remain cheap, sparse, and mostly invisible when it is not buying measurable CE
+
+Round-2 queue items:
+- sparse no-halt teacher + `workspace_slots=4`
+- sparse no-halt teacher + `n_loops=3`
+- sparse no-halt teacher + `n_kv_head=2`
+- sparse no-halt teacher + stacked winner combinations
+- stride/sample/cost variants only on top of the no-halt base
 
 What success looks like:
 - same or better CE
 - lower train step time
 - positive `compute_savings_frac`
 
-### 2. Compute Budget and Frontier Breadth
+### 2. Compute Budget, Frontier Breadth, and Chunking
 
 Files touched:
 - `ouroboros/model3/model.py`
 - `ouroboros/model3/config.py`
 
-Hypothesis:
-- some of `v2`'s quality is already saturated before 4 loops and 4 frontier blocks
+Status:
+- `n_loops=3` and `n_loops=2` both won as singles
+- shrinking frontier alone did not
 
-Auto queue items:
-- `n_loops = 3`
-- `n_loops = 2`
-- `workspace_frontier_blocks = 3`
-- `workspace_frontier_blocks = 2`
-- combinations of lower loops and smaller frontier
-- executor minimum active blocks = 2
-- dense no-executor control
+Hypothesis:
+- the next high-value question is not only loop count, but whether block size and frontier discretization are mismatched
+
+Round-2 queue items:
+- `workspace_slots=4 + n_loops=3`
+- `workspace_slots=4 + n_loops=2`
+- `workspace_block_tokens=4 + frontier_blocks=8`
+- `workspace_block_tokens=16 + frontier_blocks=2`
+- `workspace_block_tokens` / `frontier_blocks` interactions with `n_loops=3`, `workspace_slots=4`, and `n_kv_head=2`
 
 What success looks like:
 - materially better step time with little or no CE loss
@@ -184,11 +223,13 @@ Files touched:
 Hypothesis:
 - `v2` may be overpaying for capacity or under-regularizing recurrent updates
 
-Auto queue items:
-- `workspace_slots = 4` and `8`
-- `workspace_mlp_mult = 1` and `3`
-- tighter and looser update clamps
-- reintroducing only a tiny collapse penalty
+Status:
+- `workspace_mlp_mult=1` is the best pure quality winner so far
+- `workspace_slots=4` also won
+
+Round-2 queue items:
+- stack `workspace_slots=4` with the other winners
+- only revisit update-law knobs if stacked winners plateau
 
 High-value code ideas after config sweeps:
 - learned workspace carry / write-strength gate
@@ -203,15 +244,17 @@ Files touched:
 - `ouroboros/model3/summarizer.py`
 - `ouroboros/model3/model.py`
 
-Hypothesis:
-- the memory bank is one of the cheapest places to preserve more useful structure
+Status:
+- tape-only singles all lost
+- summary enrichment may still matter as an interaction, not a singleton
 
-Auto queue items:
-- `tape_recent_blocks = 8` and `32`
-- `tape_slots_per_block = 1` and `4`
-- `tape_coarse_levels = 1` and `3`
-- `tape_detach_append = False`
-- richer frontier summaries with 2 slots and tail-aware blends
+Hypothesis:
+- richer summaries may only help when the rest of the recurrent core is already cheaper or sharper
+
+Round-2 queue items:
+- richer frontier summaries + `workspace_slots=4`
+- richer frontier summaries + `n_loops=3`
+- richer frontier summaries + `n_kv_head=2`
 
 High-value code ideas:
 - summary outputs that expose both content and uncertainty/salience
@@ -225,12 +268,16 @@ Files touched:
 - `ouroboros/model3/workspace.py`
 - `ouroboros/model3/workspace_core.py`
 
-Hypothesis:
-- local causal context inside the editor may improve token refinement more cheaply than deeper recurrent loops
+Status:
+- local editor context lost as a singleton
 
-Auto queue items:
-- `editor_use_local_causal_context = True`
-- local context combined with richer frontier summaries
+Hypothesis:
+- it may still help as an interaction when the workspace and loop budgets are already cheaper
+
+Round-2 queue items:
+- local context + `workspace_slots=4`
+- local context + `n_loops=3`
+- local context + richer frontier summaries
 
 High-value code ideas:
 - dual-channel reader: separate global-workspace and frontier-workspace readers
@@ -243,33 +290,38 @@ High-value code ideas:
 Files touched:
 - `run_recursivellm_bakeoff.py`
 
-Hypothesis:
-- some architecture changes only show up when LR / decay / betas are not inherited from old baselines
+Status:
+- raw optimizer-only singles mostly lost
 
-Auto queue items:
-- LR: `2e-4`, `3.3e-4`, `5e-4`
-- weight decay: `0.05`, `0.2`
-- beta2: `0.99`
-- `(beta1, beta2) = (0.95, 0.99)`
-- optimizer + sparse-teacher interaction
+Hypothesis:
+- optimizer changes are only worth retesting around already-winning structural profiles
+
+Round-2 queue items:
+- higher LR only around `workspace_slots=4`, `n_loops=3`, or `n_kv_head=2`
+- lower weight decay only around structural winners
+- slower beta2 only around structural winners
 
 Important rule:
 - keep optimizer changes only if they are stable over multiple seeds
 
-### 7. Backbone Modernization
+### 7. Backbone and Attention Substrate
 
 Files touched:
 - `ouroboros/model3/blocks.py`
 - `ouroboros/model3/config.py`
 
-Hypothesis:
-- RoPE, GQA, and SwiGLU may help quality-per-bandwidth, but only if they fit this branch
+Status:
+- GQA won
+- RoPE and SwiGLU lost as singles
 
-Auto queue items:
-- RoPE only
-- SwiGLU only
-- GQA only
-- RoPE + GQA + SwiGLU
+Hypothesis:
+- the only substrate family worth spending more queue budget on right now is KV-head compression
+
+Round-2 queue items:
+- `n_kv_head = 1`
+- `n_kv_head = 3`
+- interactions of GQA with the winner stack
+- RoPE/SwiGLU only as late-stage long shots
 
 This stage is intentionally late because early evidence on `v3` suggested these are not automatically wins in this repo.
 
@@ -326,6 +378,7 @@ Variants:
 Why it matters:
 - cheaper than proposal softmax mixtures
 - directly inspired by Gated Delta Networks
+- especially relevant now that single-proposal mode is already the promoted base
 
 ### C. Structured Recurrent Update
 
@@ -408,7 +461,8 @@ These are not for the first overnight runs.
 
 ### 4. Adaptive Block Size
 - test `workspace_block_tokens = 4`, `8`, `16`
-- possibly coupled with frontier width
+- couple it with frontier width to preserve or intentionally shrink frontier token budget
+- this moved up into the round-2 automatic queue because it is no longer just a long shot
 
 ### 5. Distilled Control Teacher
 - run exact probe calibration periodically
@@ -429,12 +483,12 @@ If gains are below that and within seed noise:
 
 ## Recommended Promotion Order
 
-1. Promote low-risk wins from `control_teacher`
-2. Promote one or two wins from `budget`
-3. Promote any neutral-to-positive `tape_summary` win
-4. Promote `editor` only if the CE gain is consistent
+1. Promote stacked wins from `winner_interactions`
+2. Promote one chunking win only if it survives confirmation
+3. Promote one control-stack interaction only if it clearly improves CE or compute savings
+4. Promote one summary/editor interaction only if it survives confirmation
 5. Treat `optimizer` as profile-specific, not architecture-wide, until repeated
-6. Promote `substrate` only if it wins against the current branch, not because it is fashionable
+6. Treat RoPE/SwiGLU as guilty until proven useful
 
 ## Current Principle
 
