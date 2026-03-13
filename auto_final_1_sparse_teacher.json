@@ -1,0 +1,55 @@
+{
+  "repo": "/Users/jairopolanco/Projects/RecursiveLLM",
+  "steps": 32,
+  "block_size": 32,
+  "seeds": [
+    1337,
+    1338
+  ],
+  "results": {
+    "model3_v2": {
+      "rows": [
+        {
+          "seed": 1337,
+          "val_start": 10.961102366447449,
+          "val_end": 9.430683374404907,
+          "mean_step_ms": 49.28219494139475,
+          "decode_probe_ms": 18.77670898102224
+        },
+        {
+          "seed": 1338,
+          "val_start": 10.997414946556091,
+          "val_end": 9.122028708457947,
+          "mean_step_ms": 48.98139106995997,
+          "decode_probe_ms": 18.141458043828607
+        }
+      ],
+      "mean_val_start": 10.97925865650177,
+      "mean_val_end": 9.276356041431427,
+      "mean_step_ms": 49.13179300567736,
+      "mean_decode_probe_ms": 18.459083512425423
+    },
+    "model3_v3": {
+      "rows": [
+        {
+          "seed": 1337,
+          "val_start": 10.905486345291138,
+          "val_end": 9.3569837808609,
+          "mean_step_ms": 85.31274457627367,
+          "decode_probe_ms": 29.510249965824187
+        },
+        {
+          "seed": 1338,
+          "val_start": 10.973318576812744,
+          "val_end": 9.072829723358154,
+          "mean_step_ms": 85.7266640898982,
+          "decode_probe_ms": 20.60545899439603
+        }
+      ],
+      "mean_val_start": 10.939402461051941,
+      "mean_val_end": 9.214906752109528,
+      "mean_step_ms": 85.51970433308594,
+      "mean_decode_probe_ms": 25.05785448011011
+    }
+  }
+}

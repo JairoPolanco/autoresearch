@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import argparse
 import importlib
-import importlib.util
 import json
 import pickle
 import random
@@ -15,15 +14,6 @@ import numpy as np
 import torch
 
 
-def _load_module(path: Path, name: str):
-    spec = importlib.util.spec_from_file_location(name, str(path))
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f"failed to load module from {path}")
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
-
-
 def _load_cfg(config_cls, path: Path, *, vocab_size: int, block_size: int):
     ns = {"__file__": str(path.resolve())}
     code = path.read_text(encoding="utf-8")
@@ -33,6 +23,16 @@ def _load_cfg(config_cls, path: Path, *, vocab_size: int, block_size: int):
     cfg_data["vocab_size"] = int(vocab_size)
     cfg_data["block_size"] = int(block_size)
     cfg = config_cls(**cfg_data)
+    if hasattr(cfg, "validate"):
+        cfg.validate()
+    return cfg
+
+
+def _apply_overrides(cfg, overrides: dict[str, object] | None):
+    if not overrides:
+        return cfg
+    for key, value in overrides.items():
+        setattr(cfg, key, value)
     if hasattr(cfg, "validate"):
         cfg.validate()
     return cfg
@@ -118,6 +118,10 @@ def main() -> None:
     ap.add_argument("--steps", type=int, default=64)
     ap.add_argument("--block-size", type=int, default=32)
     ap.add_argument("--seeds", nargs="+", type=int, default=[1337, 1338])
+    ap.add_argument("--config-v2", default="")
+    ap.add_argument("--config-v3", default="")
+    ap.add_argument("--v2-overrides-json", default="")
+    ap.add_argument("--v3-overrides-json", default="")
     ap.add_argument("--out", default="")
     args = ap.parse_args()
 
@@ -136,8 +140,12 @@ def main() -> None:
         meta = pickle.load(handle)
     vocab_size = int(meta.get("vocab_size", 50304))
 
-    cfg_v2 = _load_cfg(config_cls, repo / "ouroboros" / "config" / "train_nano_25m_model3_v2.py", vocab_size=vocab_size, block_size=args.block_size)
-    cfg_v3 = _load_cfg(config_cls, repo / "ouroboros" / "config" / "train_nano_25m_model3_v3.py", vocab_size=vocab_size, block_size=args.block_size)
+    cfg_v2_path = Path(args.config_v2) if args.config_v2 else (repo / "ouroboros" / "config" / "train_nano_25m_model3_v2.py")
+    cfg_v3_path = Path(args.config_v3) if args.config_v3 else (repo / "ouroboros" / "config" / "train_nano_25m_model3_v3.py")
+    cfg_v2 = _load_cfg(config_cls, cfg_v2_path, vocab_size=vocab_size, block_size=args.block_size)
+    cfg_v3 = _load_cfg(config_cls, cfg_v3_path, vocab_size=vocab_size, block_size=args.block_size)
+    cfg_v2 = _apply_overrides(cfg_v2, json.loads(args.v2_overrides_json) if args.v2_overrides_json else None)
+    cfg_v3 = _apply_overrides(cfg_v3, json.loads(args.v3_overrides_json) if args.v3_overrides_json else None)
 
     payload = {
         "repo": str(repo),
